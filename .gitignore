@@ -7,3 +7,5 @@ venv/
 .streamlit/secrets.toml
 .DS_Store
 desktop.ini
+ats_mvp.db
+*.db-journal
