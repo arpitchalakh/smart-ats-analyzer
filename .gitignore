@@ -1,5 +1,9 @@
 __pycache__/
-*.pyc
+*.py[cod]
 .env
 .venv/
 env/
+venv/
+.streamlit/secrets.toml
+.DS_Store
+desktop.ini
