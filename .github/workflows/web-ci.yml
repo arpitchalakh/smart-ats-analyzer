@@ -36,3 +36,15 @@ jobs:
         env:
           OPENAI_API_KEY: test-key-for-build-only
           OPENAI_MODEL: gpt-5.6-luna
+
+      - name: Upload MVP source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-ats-analyzer-mvp-v1
+          path: |
+            .
+            !.git/**
+            !web/node_modules/**
+            !web/.next/**
+          include-hidden-files: true
+          retention-days: 7
