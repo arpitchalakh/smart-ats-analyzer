@@ -12,19 +12,24 @@ Rules:
 - The match score is an estimate, not a score from a real ATS vendor.
 - Score conservatively; missing must-have requirements should materially reduce the score.
 - Prefer exact, job-relevant keywords and concrete recommendations.
-- Only count a keyword as matched when the resume actually supports it.
-- Return valid JSON only with this exact shape:
-{
-  "match_score": 0,
-  "match_level": "Low | Moderate | Strong | Excellent",
-  "matched_keywords": ["keyword"],
-  "missing_keywords": ["keyword"],
-  "strengths": ["specific strength"],
-  "gaps": ["specific gap"],
-  "profile_summary": "2-3 sentence tailored summary using only resume facts",
-  "recommendations": ["specific actionable recommendation"],
-  "recruiter_verdict": "short hiring-screen verdict"
-}`;
+- Only count a keyword as matched when the resume actually supports it.`;
+
+const RESPONSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    match_score: { type: 'integer', minimum: 0, maximum: 100 },
+    match_level: { type: 'string', enum: ['Low', 'Moderate', 'Strong', 'Excellent'] },
+    matched_keywords: { type: 'array', items: { type: 'string' } },
+    missing_keywords: { type: 'array', items: { type: 'string' } },
+    strengths: { type: 'array', items: { type: 'string' } },
+    gaps: { type: 'array', items: { type: 'string' } },
+    profile_summary: { type: 'string' },
+    recommendations: { type: 'array', items: { type: 'string' } },
+    recruiter_verdict: { type: 'string' }
+  },
+  required: ['match_score','match_level','matched_keywords','missing_keywords','strengths','gaps','profile_summary','recommendations','recruiter_verdict']
+};
 
 async function extractText(file: File) {
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -59,7 +64,7 @@ function normalize(data: any) {
     gaps: cleanList(data?.gaps, 8),
     profile_summary: String(data?.profile_summary ?? '').trim(),
     recommendations: cleanList(data?.recommendations, 8),
-    recruiter_verdict: String(data?.recruiter_verdict ?? '').trim(),
+    recruiter_verdict: String(data?.recruiter_verdict ?? '').trim()
   };
 }
 
@@ -92,19 +97,23 @@ export async function POST(req: NextRequest) {
 
     const openaiRes = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: MODEL,
         reasoning: { effort: 'low' },
-        input: [
-          { role: 'system', content: [{ type: 'input_text', text: SYSTEM_PROMPT }] },
-          { role: 'user', content: [{ type: 'input_text', text: `<job_description>\n${jd}\n</job_description>\n\n<resume>\n${resumeText.slice(0, 120_000)}\n</resume>\n\nReturn only the requested JSON object.` }] },
-        ],
-        text: { format: { type: 'json_object' } },
-      }),
+        instructions: SYSTEM_PROMPT,
+        input: `<job_description>\n${jd}\n</job_description>\n\n<resume>\n${resumeText.slice(0,120_000)}\n</resume>`,
+        text: {
+          verbosity: 'low',
+          format: {
+            type: 'json_schema',
+            name: 'ats_analysis',
+            strict: true,
+            schema: RESPONSE_SCHEMA
+          }
+        },
+        store: false
+      })
     });
 
     const payload = await openaiRes.json();
